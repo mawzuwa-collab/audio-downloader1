@@ -1,0 +1,47 @@
+name: Build Windows EXE
+
+# Läuft automatisch bei jedem Push auf main, und lässt sich zusätzlich
+# manuell über den "Run workflow"-Button im Actions-Tab starten.
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Wichtig: läuft auf einem echten Windows-Server, damit eine echte
+    # Windows-.exe entsteht (PyInstaller kann nicht plattformübergreifend
+    # kompilieren).
+    runs-on: windows-latest
+
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v4
+
+      - name: Python installieren
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Abhängigkeiten installieren
+        run: pip install -r requirements.txt
+
+      - name: .exe mit PyInstaller bauen
+        run: python build.py
+
+      - name: FFmpeg herunterladen und beilegen
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_temp
+          $ffmpegExe = Get-ChildItem -Path ffmpeg_temp -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
+          Copy-Item $ffmpegExe.FullName -Destination "dist\ffmpeg.exe"
+
+      - name: Fertige .exe als Download bereitstellen
+        uses: actions/upload-artifact@v4
+        with:
+          name: AudioDownloader-Windows
+          path: |
+            dist/AudioDownloader.exe
+            dist/ffmpeg.exe
+          retention-days: 30
